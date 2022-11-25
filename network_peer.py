@@ -674,13 +674,12 @@ class NetworkPeer(Base):
             file_content = file_content.encode(FORMAT)
             with open(file_name, "wb") as f:
                 f.write(file_content)
-    ## ===========================================================##
 
 
+## ===========================================================##
 ## =======================================================##
-if __name__ == '__main__':
-    app = tkinterApp()
-    app.title('Chat App')
-    app.geometry("1024x600")
-    app.resizable(False, False)
-    app.mainloop()
+app = tkinterApp()
+app.title('Chat App')
+app.geometry("1024x600")
+app.resizable(False, False)
+app.mainloop()
