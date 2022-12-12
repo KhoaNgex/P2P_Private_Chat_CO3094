@@ -84,3 +84,53 @@ def update_user_password(username, password):
     finally:
         if cnt:
             cnt.close() 
+
+def update_user_address_port(username, ipaddress, port):
+    try:
+        # Connect to DB
+        cnt = sqlite3.connect('user.db')
+        # update a record 
+        cnt.execute('''UPDATE users SET IPADDRESS = ?, PORT = ? WHERE NAME = ?;''', (ipaddress,port,username));
+        cnt.commit()
+    # Handle errors
+    except sqlite3.Error as error:
+        print('Error occured - ', error)
+    # Close DB Connection irrespective of success or failure
+    finally:
+        if cnt:
+            cnt.close() 
+
+def get_all_table():
+    try:
+        # Connect to DB 
+        cnt = sqlite3.connect('user.db')
+        # open a cursor
+        cursor = cnt.execute('''SELECT * FROM users;''')
+        user_list = []
+        for row in cursor:
+            user_list.append(row)
+
+        cursor.close() # close cursor
+    # Handle errors
+    except sqlite3.Error as error:
+        print('Error occured - ', error)
+    # Close DB Connection irrespective of success or failure
+    finally:
+        if cnt:
+            cnt.close() 
+            print (user_list)
+
+def delete_all_users():
+    try:
+        # Connect to DB
+        cnt = sqlite3.connect('user.db')
+        # delete a record 
+        cnt.execute('''DELETE FROM users;''', )
+        cnt.commit()
+    # Handle errors
+    except sqlite3.Error as error:
+        print('Error occured - ', error)
+    # Close DB Connection irrespective of success or failure
+    finally:
+        if cnt:
+            cnt.close() 

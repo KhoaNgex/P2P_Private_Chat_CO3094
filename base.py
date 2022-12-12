@@ -1,9 +1,7 @@
 import json
+import threading
 import socket
 from abc import abstractmethod
-
-from thread_return import ThreadWithReturn
-
 # the format in which encoding and decoding will occur
 FORMAT = "utf-8"
 BUFFER_SIZE = 2048
@@ -37,8 +35,9 @@ class Base():
     def recv_input_stream(self, conn):
         # receive from client 
         buf = conn.recv(BUFFER_SIZE)
+        message = buf.decode(FORMAT)  
         # deserialize (json type -> python type)
-        message = json.loads(buf.decode(FORMAT))
+        message = json.loads(message)
         # map into function
         self.function_mapper(message)
 
@@ -46,11 +45,9 @@ class Base():
         while True:
             # wait until receive a connection request -> return socket for connection from client
             conn, addr = self.socket.accept()
-            input_stream = ThreadWithReturn(target=self.recv_input_stream, args=(conn,))
+            input_stream = threading.Thread(target=self.recv_input_stream, args=(conn,))
+            input_stream.daemon = True
             input_stream.start()
-            val = input_stream.join()
-            if val == -1:
-                return
 
     @abstractmethod
     def run(self):
@@ -60,10 +57,6 @@ class Base():
     def client_send(address, msgtype, msgdata):
         # msgtype for mapping into corresponding function
         # msgdata contains sent data
-        msg_special = 'file_content'
-        if msg_special in msgdata:
-            if isinstance(msgdata[msg_special], bytes):
-                msgdata[msg_special] = msgdata[msg_special].decode(FORMAT)
         message = {'msgtype': msgtype, 'msgdata': msgdata}
         # serialize into JSON file for transmitting over network
         message = json.dumps(message).encode(FORMAT)

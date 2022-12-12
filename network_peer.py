@@ -1,20 +1,25 @@
 import os
+import json
+import socket
 import threading
 import time
+import random
 from base import Base
-
+ 
 # GUI
 import tkinter as tk
 import tkinter.messagebox
 import tkinter.filedialog
-from PIL import ImageTk
+from PIL import ImageTk 
 
 # aid
 from hash_function import MD5_hash
 import asset
+
 # ----CONSTANT----#
 FORMAT = "utf-8"
 BUFFER_SIZE = 2048
+OFFSET = 10000
 
 ## ====================GUI IMPLEMENT======================##
 
@@ -34,6 +39,8 @@ class tkinterApp(tk.Tk):
         container.pack(side="top", fill="both", expand=True)
         container.grid_rowconfigure(0, weight=1)
         container.grid_columnconfigure(0, weight=1)
+
+        self.chatroom_textCons = None
 
         # initializing frames to an empty array
         self.frames = {}
@@ -66,7 +73,7 @@ class StartPage(tk.Frame):
         tk.Label(self, text="", bg='white').pack()
 
         # Set port label
-        tk.Label(self, text="Set Port (3000 -> 65535)", bg='white').pack()
+        tk.Label(self, text="Set Port (1 -> 9999)", bg='white').pack()
         # Set port entry
         self.port_entry = tk.Entry(
             self, width="20", font=("Verdana", 11))
@@ -74,22 +81,33 @@ class StartPage(tk.Frame):
         tk.Label(self, text="", bg='white').pack()
 
         # create a register button
-        tk.Button(self, text="Register", height="2", width="30", bg="green", fg="white", command=lambda: self.enter_app(
+        tk.Button(self, text="Register", height="2", width="30", bg="#5D0CB5", fg="white", command=lambda: self.enter_app(
             controller=controller, port=self.port_entry.get(), page=RegisterPage)).pack()
         tk.Label(self, text="", bg='white').pack()
 
         # create a login button
-        tk.Button(self, text="Login", height="2", width="30", bg="blue", fg="white", command=lambda: self.enter_app(
+        tk.Button(self, text="Login", height="2", width="30", bg="#A021E2", fg="white", command=lambda: self.enter_app(
             controller=controller, port=self.port_entry.get(), page=LoginPage)).pack()
 
     def enter_app(self, controller, port, page):
         try:
+            # get peer current ip address -> assign to serverhost
+            hostname=socket.gethostname()   
+            IPAddr=socket.gethostbyname(hostname)  
+
             # init server
             global network_peer
-            network_peer = NetworkPeer(serverport=int(port))
+            network_peer = NetworkPeer(serverhost=IPAddr, serverport=int(port))
+           
             # A child thread for receiving message
-            t = threading.Thread(target=network_peer.recv)
-            t.start()
+            recv_t = threading.Thread(target=network_peer.recv)
+            recv_t.daemon = True
+            recv_t.start()
+
+            # A child thread for receiving file
+            recv_file_t = threading.Thread(target=network_peer.recv_file_content)
+            recv_file_t.daemon = True
+            recv_file_t.start()
             controller.show_frame(page)
         except:
             self.port_entry.delete(0, tk.END)
@@ -200,7 +218,14 @@ class PrivateChatPage(tk.Frame):
         self.msg = ""
 
         tk.Label(self, bg="#573d9c", fg="#ffffff", text=friend_name,
-                 font="Helvetica 17 bold", pady=15).grid(row=0, column=0, columnspan=4, sticky="news")
+                 font="Helvetica 17 bold", pady=15).grid(row=0, column=0, columnspan=2, sticky="news")
+
+        chatroom_icon = ImageTk.PhotoImage(asset.chatroom_icon)
+        chatroom_button = tk.Button(self, image=chatroom_icon, border=0,
+                                  background="#573d9c", activebackground="#573d9c",
+                                  command=lambda: self.open_chatroom())
+        chatroom_button.image = chatroom_icon
+        chatroom_button.grid(row=0, column=2, columnspan=3, sticky="news")
 
         self.message_area = tk.Text(
             self, bg="#f2f0f6", fg="#1b142c", font="Helvetica 13", width=1, padx=15, pady=15)
@@ -235,6 +260,7 @@ class PrivateChatPage(tk.Frame):
             self.entry_msg.delete(0, tk.END)
             st_t = threading.Thread(
                 target=network_peer.send_chat_message, args=(self.friend_name, self.msg))
+            st_t.daemon = True
             st_t.start()
             # insert messages to text box
             message = network_peer.name + ": " + self.msg
@@ -256,10 +282,108 @@ class PrivateChatPage(tk.Frame):
         if msg_box == 'yes':
             sf_t = threading.Thread(
                 target=network_peer.transfer_file, args=(self.friend_name, file_path))
+            sf_t.daemon = True
             sf_t.start()
             tkinter.messagebox.showinfo(
                 "File Transfer", '{} has been sent to {}!'.format(file_name, friend_name))
+    
+    def open_chatroom(self): 
+        chatroom = tk.Toplevel(app)
+     
+        chatroom.title("Chat room")
+        
+        chatroom.geometry("470x550")
 
+        labelHead = tk.Label(chatroom,
+                               bg="#17202A",
+                               fg="#EAECEE",
+                               text="WeChat Public Room",
+                               font="Helvetica 13 bold",
+                               pady=5)
+ 
+        labelHead.place(relwidth=1)
+        line = tk.Label(chatroom,
+                          width=450,
+                          bg="#ABB2B9")
+ 
+        line.place(relwidth=1,
+                        rely=0.07,
+                        relheight=0.012)
+        
+     
+
+        app.chatroom_textCons = tk.Text(chatroom,
+                             width=20,
+                             height=2,
+                             bg="#17202A",
+                             fg="#EAECEE",
+                             font="Helvetica 14",
+                             padx=5,
+                             pady=5)
+ 
+        app.chatroom_textCons.place(relheight=0.745,
+                            relwidth=1,
+                            rely=0.08)
+ 
+        labelBottom = tk.Label(chatroom,
+                                 bg="#ABB2B9",
+                                 height=80)
+ 
+        labelBottom.place(relwidth=1,
+                               rely=0.825)
+ 
+        self.entryMsg = tk.Entry(labelBottom,
+                              bg="#2C3E50",
+                              fg="#EAECEE",
+                              font="Helvetica 13")
+ 
+        # place the given widget
+        # into the gui window
+        self.entryMsg.place(relwidth=0.74,
+                            relheight=0.06,
+                            rely=0.008,
+                            relx=0.011)
+ 
+        self.entryMsg.focus()
+ 
+        # create a Send Button
+        self.buttonMsg = tk.Button(labelBottom,
+                                text="Send",
+                                font="Helvetica 10 bold",
+                                width=20,
+                                bg="#ABB2B9", command=lambda: self.sendPublicChatButton(self.entryMsg.get()))
+ 
+        self.buttonMsg.place(relx=0.77,
+                             rely=0.008,
+                             relheight=0.06,
+                             relwidth=0.22)
+ 
+        app.chatroom_textCons.config(cursor="arrow")
+ 
+        # create a scroll bar
+        scrollbar = tk.Scrollbar(app.chatroom_textCons)
+ 
+        # place the scroll bar
+        # into the gui window
+        scrollbar.place(relheight=1,
+                        relx=0.974)
+ 
+        scrollbar.config(command=app.chatroom_textCons.yview)
+ 
+        app.chatroom_textCons.config(state=tk.DISABLED)
+    
+        # Display until closed manually
+        chatroom.mainloop()
+    
+    # function to send public messages
+    def sendPublicChatButton(self, msg):
+        app.chatroom_textCons.config(state=tk.DISABLED)
+        self.msg = msg
+        self.entryMsg.delete(0, tk.END)
+        snd = threading.Thread(target=network_peer.sendPublicMessage, args=(self.msg,))
+        snd.daemon = True
+        snd.start()
+ 
 
 class ChatPage(tk.Frame):
     def __init__(self, parent, controller):
@@ -297,8 +421,15 @@ class ChatPage(tk.Frame):
                                  fg="#e6e6fa", font="Helvetica 13 bold", pady=5, height=2, width=1)
         request_label.grid(row=0, column=0, sticky="news")
 
+        logout_icon = ImageTk.PhotoImage(asset.logout_icon)
+        logout_button = tk.Button(self.f3, image=logout_icon, border=0,
+                                  background="#8372f2", activebackground="#6a54f7",
+                                  command=lambda: self.log_out())
+        logout_button.image = logout_icon
+        logout_button.grid(row=0, column=1, sticky="news")
+
         wrapper = tk.Frame(self.f3)
-        wrapper.grid(row=1, column=0, sticky="news")
+        wrapper.grid(row=1, column=0, columnspan=2, sticky="news")
 
         wrapper.grid_columnconfigure(0, weight=1)
         wrapper.grid_rowconfigure(0, weight=1)
@@ -394,13 +525,19 @@ class ChatPage(tk.Frame):
     def update_online_user_list(self):
         # request getting online user list
         network_peer.send_listpeer()
-        time.sleep(0.3)
-        i = 0
-        for online_user in network_peer.onlinelist:
-            self.user_name_frame[i].config(text=online_user)
-            self.user_name_frame[i].config(
-                command=lambda online_user=online_user: self.make_chat_request(online_user))
-            i = i+1
+        time.sleep(0.1)
+        
+        for j in range(0, len(self.user_name_frame)):
+            self.user_name_frame[j].config(text="Load to see...")
+            self.user_name_frame[j].config(command=None)
+        
+        if len(network_peer.onlinelist) > 0:
+            i = 0
+            for online_user in network_peer.onlinelist:
+                self.user_name_frame[i].config(text=online_user)
+                self.user_name_frame[i].config(
+                    command=lambda online_user=online_user: self.make_chat_request(online_user))
+                i = i+1
 
     def make_chat_request(self, online_user):
         network_peer.send_request(online_user)
@@ -418,6 +555,10 @@ class ChatPage(tk.Frame):
             parent=self.f2, controller=self, friend_name=friend)
         self.frame_list[friend] = chat_frame
         self.frame_list[friend].tkraise()
+    
+    def log_out(self):
+        app.show_frame(LoginPage)
+        network_peer.send_logout_request()
 ## =======================================================##
 
 ## ====================CORE IMPLEMENT======================##
@@ -426,17 +567,21 @@ class ChatPage(tk.Frame):
 class NetworkPeer(Base):
     def __init__(self, serverhost='localhost', serverport=30000, server_info=('localhost', 40000)):
         super(NetworkPeer, self).__init__(serverhost, serverport)
+
         # init host and port of central server
         self.server_info = server_info
+
         # peer name
         self.name = ""
         # peer password
         self.password = ""
+
         # all peers it can connect (network peers)
         self.connectable_peer = {}
         self.onlinelist = []
         # peers it has connected (friend)
         self.friendlist = {}
+
         self.message_format = '{peername}: {message}'
         # file buffer
         self.file_buf = []
@@ -452,7 +597,7 @@ class NetworkPeer(Base):
             'CHAT_ACCEPT': self.chat_accept,
             'CHAT_REFUSE': self.chat_refuse,
             'CHAT_MESSAGE': self.recv_message,
-            'FILE_TRANSFER': self.recv_file_content,
+            'CHAT_PUBLIC': self.recv_public_message,
         }
         for msgtype, function in handlers.items():
             self.add_handler(msgtype, function)
@@ -521,6 +666,7 @@ class NetworkPeer(Base):
     def get_online_users(self, msgdata):
         """ Processing received message from server:
             Output username of all peers that have been registered on the server and are online."""
+        self.connectable_peer.clear()
         for key, value in msgdata['online_user_list'].items():
             self.connectable_peer[key] = tuple(value)
         if self.name in self.connectable_peer:
@@ -531,13 +677,12 @@ class NetworkPeer(Base):
     ## ==========implement protocol for chat request (can upgrade to friend request)==========##
     def send_request(self, peername):
         """ Send a chat request to an online user. """
-        print(self.connectable_peer, "-----------------------------------")
         if peername not in self.friendlist:
             try:
                 server_info = self.connectable_peer[peername]
             except KeyError:
                 display_noti("Chat Request Error",
-                             'This peer ({}) is not registered.'.format(peername))
+                             'This peer ({}) is not available.'.format(peername))
             else:
                 data = {
                     'peername': self.name,
@@ -585,6 +730,28 @@ class NetworkPeer(Base):
         display_noti("Chat Request Result", 'CHAT REFUSED!')
     ## ===========================================================##
 
+    ## ==========implement protocol for public messaging==========##
+    def sendPublicMessage(self, message):
+        """ Send a chat message to public community. """
+        try:
+            data = {
+                'name': self.name,
+                'message': message
+            }
+            self.client_send(self.server_info, msgtype='PUBLIC_CHAT', msgdata=data)
+        except KeyError:
+            display_noti("Public Messaging Result", 'Cannot send message!')
+    
+    def recv_public_message(self, msgdata):
+        """ Processing received public chat message from central server."""
+        # insert messages to text box
+        message = msgdata['name'] + ": " + msgdata['message']
+        app.chatroom_textCons.config(state=tk.NORMAL)
+        app.chatroom_textCons.insert(tk.END, message+"\n\n")
+        app.chatroom_textCons.config(state=tk.DISABLED)
+        app.chatroom_textCons.see(tk.END)
+    ## ===========================================================##
+
     ## ==========implement protocol for text messaging==========##
     def send_chat_message(self, friend, message):
         """ Send a chat message to friend. """
@@ -613,8 +780,6 @@ class NetworkPeer(Base):
                 state=tk.DISABLED)
             app.frames[ChatPage].frame_list[friend_name].message_area.see(
                 tk.END)
-            print(self.message_format.format(
-                peername=friend_name, message=msgdata['message']))
     ## ===========================================================##
 
     ## ==========implement protocol for file tranfering==========##
@@ -626,60 +791,98 @@ class NetworkPeer(Base):
             display_noti("File Transfer Result", 'Friend does not exist!')
         else:
             file_name = os.path.basename(file_path)
-            # file_name_data = {
-            #     'friend_name': self.name,
-            #     'file_name': file_name,
-            # }
-            # self.client_send(peer_info, msgtype='FILE_TRANSFER_NAME', msgdata=file_name_data)
+            def fileThread(filename):
+                file_sent = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                file_sent.connect((peer_info[0], peer_info[1]+OFFSET))
 
-            with open(file_path, "rb") as f:
-                while True:
-                    # read the bytes from the file
-                    bytes_read = f.read(BUFFER_SIZE)
-                    if not bytes_read:
-                        # file transmitting is done, send signal to finish file transfer process
-                        file_content_data = {
-                            'friend_name': self.name,
-                            'file_name': file_name,
-                            'file_content': 'end',
-                        }
-                        self.client_send(
-                            peer_info, msgtype='FILE_TRANSFER', msgdata=file_content_data)
-                        break
-                    file_content_data = {
-                        'friend_name': self.name,
-                        'file_name': file_name,
-                        'file_content': bytes_read,
-                    }
-                    self.client_send(
-                        peer_info, msgtype='FILE_TRANSFER', msgdata=file_content_data)
+                # send filename and friendname
+                fileInfo = {
+                    'filename': filename,
+                    'friendname': peer,
+                }
 
-    # def recv_file_name(self, msgdata):
-    #     """ Processing received file name from peer."""
-    #     friend_name = msgdata['friend_name']
-    #     file_name = msgdata['file_name']
-    #     file_name = friend_name + "_" + file_name
-    #     self.file_buf.append(file_name)
+                fileInfo = json.dumps(fileInfo).encode(FORMAT)
+                file_sent.send(fileInfo)
+                
+                msg = file_sent.recv(BUFFER_SIZE).decode(FORMAT)
+                print(msg)
 
-    def recv_file_content(self, msgdata):
+                with open(file_path, "rb") as f:
+                    while True:
+                        # read the bytes from the file
+                        bytes_read = f.read(BUFFER_SIZE)
+                        if not bytes_read:
+                            break
+                        file_sent.sendall(bytes_read)
+                file_sent.shutdown(socket.SHUT_WR)
+                file_sent.close()
+                display_noti("File Transfer Result", 'File has been sent!')
+                return
+            t_sf = threading.Thread(target=fileThread,args=(file_name,))
+            t_sf.daemon = True
+            t_sf.start()
+
+    def recv_file_content(self):
         """ Processing received file content from peer."""
-        friend_name = msgdata['friend_name']
-        file_name = msgdata['file_name']
-        file_name = friend_name + "_" + file_name
-        file_content = msgdata['file_content']
-        if str(file_content) == 'end':
-            display_noti("File Transfer Result", "File Transfer Done!")
-        else:
-            # encode to byte
-            file_content = file_content.encode(FORMAT)
-            with open(file_name, "wb") as f:
-                f.write(file_content)
+        self.file_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # bind the socket to our local address
+        self.file_socket.bind((self.serverhost, int(self.serverport) + OFFSET))
+        self.file_socket.listen(5)
 
+        while True:
+            conn, addr = self.file_socket.accept()
+            buf = conn.recv(BUFFER_SIZE)
+            message = buf.decode(FORMAT)
+
+            # deserialize (json type -> python type)
+            recv_file_info = json.loads(message)
+
+            conn.send("Filename received.".encode(FORMAT))
+            print(recv_file_info)
+
+            file_name = str(random.randint(1, 100000000))+ "_" + recv_file_info['filename']
+            friend_name = recv_file_info['friendname']
+
+            with open(file_name, "wb") as f:
+                while True:
+                    bytes_read = conn.recv(BUFFER_SIZE)
+                    if not bytes_read:    
+                        # nothing is received
+                        # file transmitting is done
+                        break
+                    # write to the file the bytes we just received
+                    f.write(bytes_read)
+
+            conn.shutdown(socket.SHUT_WR)
+            conn.close()
+
+            display_noti("File Transfer Result", 'You receive a file with name ' + file_name + ' from ' + friend_name)
+    
+    ## ===========================================================##
+    
+    ## ==========implement protocol for log out & exit ===================##
+
+    def send_logout_request(self):
+        """ Central Server deletes user out of online user list """
+        peer_info = {
+            'peername': self.name,
+        }
+        self.client_send(self.server_info,
+                         msgtype='PEER_LOGOUT', msgdata=peer_info)
+
+    ## ===========================================================##
 
 ## ===========================================================##
-## =======================================================##
+## ===========================================================##
 app = tkinterApp()
 app.title('Chat App')
 app.geometry("1024x600")
 app.resizable(False, False)
+
+def handle_on_closing_event():
+    if tkinter.messagebox.askokcancel("Quit", "Do you want to quit?"):
+        network_peer.send_logout_request()
+        app.destroy()
+
+app.protocol("WM_DELETE_WINDOW", handle_on_closing_event)
 app.mainloop()

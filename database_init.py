@@ -9,7 +9,9 @@ try:
     cnt.execute('''CREATE TABLE users(
         ID INTEGER PRIMARY KEY AUTOINCREMENT,
         NAME TEXT UNIQUE,
-        PASSWORD TEXT
+        PASSWORD TEXT,
+        IPADDRESS TEXT,
+        PORT INTEGER
         );''')
 # Handle errors
 except sqlite3.Error as error:
