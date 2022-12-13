@@ -1,4 +1,4 @@
-import threading
+import socket
 from base import Base
 from persistence import *
 
@@ -117,4 +117,4 @@ class CentralServer(Base):
 
 if __name__ == '__main__':
     server = CentralServer()
-    server.recv()
+    server.input_recv()

@@ -1,2 +1,1 @@
-hostname=socket.gethostname()   
-IPAddr=socket.gethostbyname(hostname)   
+server_info

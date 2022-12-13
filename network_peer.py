@@ -100,7 +100,7 @@ class StartPage(tk.Frame):
             network_peer = NetworkPeer(serverhost=IPAddr, serverport=int(port))
            
             # A child thread for receiving message
-            recv_t = threading.Thread(target=network_peer.recv)
+            recv_t = threading.Thread(target=network_peer.input_recv)
             recv_t.daemon = True
             recv_t.start()
 
@@ -272,10 +272,7 @@ class PrivateChatPage(tk.Frame):
     def sendFile(self, friend_name):
         file_path = tkinter.filedialog.askopenfilename(initialdir="/",
                                                        title="Select a File",
-                                                       filetypes=(("Text files",
-                                                                   "*.txt*"),
-                                                                  ("all files",
-                                                                   "*.*")))
+                                                       filetypes=(("all files", "*.*")))
         file_name = os.path.basename(file_path)
         msg_box = tkinter.messagebox.askquestion('File Explorer', 'Are you sure to send {} to {}?'.format(file_name, friend_name),
                                                  icon="question")
@@ -565,7 +562,7 @@ class ChatPage(tk.Frame):
 
 
 class NetworkPeer(Base):
-    def __init__(self, serverhost='localhost', serverport=30000, server_info=('localhost', 40000)):
+    def __init__(self, serverhost='localhost', serverport=30000, server_info=('192.168.1.8', 40000)):
         super(NetworkPeer, self).__init__(serverhost, serverport)
 
         # init host and port of central server
@@ -881,7 +878,6 @@ app.resizable(False, False)
 
 def handle_on_closing_event():
     if tkinter.messagebox.askokcancel("Quit", "Do you want to quit?"):
-        network_peer.send_logout_request()
         app.destroy()
 
 app.protocol("WM_DELETE_WINDOW", handle_on_closing_event)

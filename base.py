@@ -9,12 +9,14 @@ BUFFER_SIZE = 2048
 class Base():
     def __init__(self, serverhost='localhost', serverport=10000, listen_num=100):
         # host and listening port of network peers/central server
-        self.serverhost, self.serverport = serverhost, int(serverport)
+        hostname = socket.gethostname()   
+        self.serverhost = socket.gethostbyname(hostname)  
+        self.serverport = int(serverport)
         
         # create server TCP socket (for listening)
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # bind the socket to our local address
-        self.socket.bind((serverhost, int(serverport)))
+        self.socket.bind((self.serverhost, self.serverport))
         self.socket.listen(listen_num)
         
         # peerlist: dict with key is peer name and value is tuple (host,port) 
@@ -41,7 +43,7 @@ class Base():
         # map into function
         self.function_mapper(message)
 
-    def recv(self):
+    def input_recv(self):
         while True:
             # wait until receive a connection request -> return socket for connection from client
             conn, addr = self.socket.accept()
